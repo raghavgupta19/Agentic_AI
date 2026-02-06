@@ -31,12 +31,26 @@ if user_query:
         country_name = user_query.title().strip()
 
     # Attempt to extract attribute(s) from query
-    attribute_patterns = ["capital", "population", "currency", "leader", "president", "pm",
-                          "official languages", "religion", "density", "gdp", "hdi", "calling code"]
+    attribute_patterns = {
+        "pm": ["pm", "prime_minister", "prime minister", "premier"],
+        "president": ["president"],
+        "capital": ["capital"],
+        "population": ["population"],
+        "currency": ["currency"],
+        "official languages": ["official languages", "language"],
+        "religion": ["religion"],
+        "density": ["density"],
+        "gdp": ["gdp"],
+        "hdi": ["hdi"],
+        "calling code": ["calling code", "code"]
+    }
     attributes_requested = []
-    for attr in attribute_patterns:
-        if attr in user_query.lower():
-            attributes_requested.append(attr)
+    query_lower = user_query.lower()
+    for standard_attr, patterns in attribute_patterns.items():
+        for pattern in patterns:
+            if pattern in query_lower:
+                attributes_requested.append(standard_attr)
+                break
 
     if not attributes_requested:
         st.error("❌ Could not identify attribute in your query.")
@@ -60,12 +74,18 @@ if user_query:
         if data:
             # ----------------- DISPLAY ONLY REQUESTED ATTRIBUTES -----------------
             for attr in attributes_requested:
-                # First try graph
+                val = None
+                
+                # First try graph with fuzzy matching
                 val = get_from_graph(country_name, attr)
+                
+                # Fallback to DB dictionary with better matching
                 if not val:
-                    # fallback to DB dictionary
+                    attr_normalized = attr.lower().replace(" ", "").replace("_", "")
                     for key, value in data.items():
-                        if attr.replace(" ", "").lower() in key.replace("_", "").lower():
+                        key_normalized = key.lower().replace(" ", "").replace("_", "")
+                        # Check if either contains the other
+                        if attr_normalized in key_normalized or key_normalized in attr_normalized:
                             val = value
                             break
 
@@ -78,19 +98,27 @@ if user_query:
             if st.button("Show Graph"):
                 G_nx = get_country_subgraph_wrapper(country_name)
                 if G_nx and G_nx.number_of_nodes() > 0:
-                    hv_graph = hv.Graph.from_networkx(G_nx, nx.spring_layout)
-                    hv_graph = hv_graph.opts(
-                        hv.opts.Graph(
-                            node_color='lightblue',
-                            edge_color='gray',
-                            width=800,
-                            height=800,
-                            node_size=15,
-                            tools=['hover', 'tap', 'box_select'],
-                            inspection_policy='nodes'
+                    try:
+                        hv_graph = hv.Graph.from_networkx(G_nx, nx.spring_layout)
+                        hv_graph = hv_graph.opts(
+                            hv.opts.Graph(
+                                node_color='lightblue',
+                                edge_color='gray',
+                                width=800,
+                                height=800,
+                                node_size=15,
+                                tools=['hover', 'tap', 'box_select'],
+                                inspection_policy='nodes'
+                            )
                         )
-                    )
-                    html = file_html(hv_graph, CDN, f"{country_name} Graph")
-                    components.html(html, height=800, scrolling=True)
+                        # Convert to bokeh plot before embedding
+                        bokeh_plot = hv.render(hv_graph)
+                        if bokeh_plot:
+                            html = file_html(bokeh_plot, CDN, f"{country_name} Graph")
+                            components.html(html, height=800, scrolling=True)
+                        else:
+                            st.warning("⚠️ Could not render graph visualization.")
+                    except Exception as e:
+                        st.error(f"❌ Error rendering graph: {e}")
                 else:
                     st.warning("⚠️ No graph data available for this country.")

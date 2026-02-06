@@ -10,7 +10,18 @@ def canonicalize_key(key: str) -> str:
     key = re.sub(r'\[.*?\]', '', key)
     key = re.sub(r'[^a-z0-9 ]', '', key)
     key = re.sub(r'\s+', '_', key)
-    return key.strip('_')
+    key = key.strip('_')
+    
+    # Map common variations to standard forms
+    mapping = {
+        'prime_minister': 'pm',
+        'president': 'president',
+        'capital_and_largest_city': 'capital',
+        'official_language_and_national_language': 'official_languages',
+        'recognised_regional_languages': 'recognised_regional_languages',
+        'ethnic_groups': 'demonyms',
+    }
+    return mapping.get(key, key)
 
 def clean_value(value: str) -> str:
     """Clean values: remove brackets, ranks, coordinates, extra spaces"""

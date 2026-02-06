@@ -13,12 +13,15 @@ DB_PATH = "data/countries.db"
 # List of attributes we want to treat as multi-value
 MULTI_VALUE_KEYS = [
     "officiallanguages",
+    "official_languages",
     "recognised_regionallanguages",
+    "recognised_regional_languages",
     "native_languages",
     "religion",
     "currency",
     "capital",
-    "demonyms"
+    "demonyms",
+    "ethnicgroups"
 ]
 
 # ------------------ DB INIT ------------------
@@ -66,14 +69,21 @@ def normalize_graph_key(key: str) -> str:
     key = key.lower()
     key = key.replace(" ", "").replace("-", "").replace("_and_", "_")
     mapping = {
-        "officiallanguageandnationallanguage": "officiallanguages",
-        "officiallanguages": "officiallanguages",
-        "recognisedregionallanguages": "recognised_regionallanguages",
+        "officiallanguageandnationallanguage": "official_languages",
+        "officiallanguages": "official_languages",
+        "recognisedregionallanguages": "recognised_regional_languages",
         "native_languages": "native_languages",
         "capitalandlargestcity": "capital",
         "ethnicgroups": "demonyms",
+        "ethnicity": "demonyms",
         "religion": "religion",
-        "currency": "currency"
+        "currency": "currency",
+        "pm": "pm",
+        "prime_minister": "pm",
+        "primeministerofind": "pm",
+        "president": "president",
+        "calling_code": "calling_code",
+        "callingcode": "calling_code"
     }
     return mapping.get(key, key)
 
@@ -111,13 +121,15 @@ def build_graph_from_db():
 def get_from_graph(country: str, attribute: str):
     G = build_graph_from_db()
     cnode = f"country:{country}"
-    attribute = attribute.lower().replace(" ", "")
+    attribute_norm = attribute.lower().replace(" ", "").replace("_", "")
     if cnode not in G:
         return None
     for neighbor in G.neighbors(cnode):
-        rel = G.edges[cnode, neighbor]["relation"].lower().replace(" ", "")
-        lbl = str(G.nodes[neighbor]["label"]).lower().replace(" ", "")
-        if attribute in rel or attribute in lbl:
+        rel = G.edges[cnode, neighbor]["relation"].lower().replace(" ", "").replace("_", "")
+        lbl = str(G.nodes[neighbor]["label"]).lower().replace(" ", "").replace("_", "")
+        # Improved fuzzy matching
+        if (attribute_norm in rel or rel in attribute_norm or 
+            attribute_norm in lbl or lbl in attribute_norm):
             return G.nodes[neighbor]["label"]
     return None
 
